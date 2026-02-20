@@ -1,7 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal, X, Play, Square } from 'lucide-react';
 import io from 'socket.io-client';
 import { getWebSocketURL } from '../config/api.config';
+
+// Helper to decode JWT and get user ID
+const getUserIdFromToken = () => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    if (!token) return 'anonymous';
+    
+    // Decode JWT payload (base64 decode)
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.id || 'anonymous';
+  } catch (e) {
+    return 'anonymous';
+  }
+};
 
 const TerminalComponent = ({ isOpen, onClose, accessToken }) => {
   const terminalRef = useRef(null);
@@ -12,24 +26,32 @@ const TerminalComponent = ({ isOpen, onClose, accessToken }) => {
   const [status, setStatus] = useState('disconnected');
   const [language, setLanguage] = useState('javascript');
 
+  const userId = getUserIdFromToken();
+
   useEffect(() => {
     if (!isOpen) return;
 
-    // Connect to WebSocket with auth token. Use relative URL in development so CRA proxy forwards to backend.
+    // Connect to WebSocket with auth token
     const connectOptions = {
       query: {
-        userId: 'default-user',
+        userId: userId,
         token: accessToken,
       },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000,
     };
 
+    // Use WebSocket URL based on environment
+    let socketUrl;
     if (process.env.NODE_ENV === 'development') {
-      socketRef.current = io('/', connectOptions);
+      socketUrl = '/';
     } else {
-      const wsURL = getWebSocketURL();
-      socketRef.current = io(wsURL, connectOptions);
+      socketUrl = getWebSocketURL();
     }
+    
+    socketRef.current = io(socketUrl, connectOptions);
 
     socketRef.current.on('connect', () => {
       setStatus('connected');
@@ -76,7 +98,7 @@ const TerminalComponent = ({ isOpen, onClose, accessToken }) => {
         socketRef.current.disconnect();
       }
     };
-  }, [isOpen, accessToken]);
+  }, [isOpen, accessToken, userId]);
 
   const executeCode = () => {
     if (!input.trim() || isRunning || !socketRef.current) return;

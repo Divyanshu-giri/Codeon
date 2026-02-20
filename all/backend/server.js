@@ -60,33 +60,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Debug middleware to log Origin and CORS decisions
-app.use((req, res, next) => {
-  try {
-    const origin = req.headers.origin;
-    console.log('CORS DEBUG - incoming origin:', origin);
-  } catch (e) {
-    console.error('CORS DEBUG error:', e && e.message);
-  }
-  next();
-});
-
-// Debug middleware to log Origin and CORS decision for troubleshooting
-app.use((req, res, next) => {
-  const origin = req.headers.origin || 'none';
-  try {
-    // Use corsOptions.origin to check
-    corsOptions.origin(origin, (err, allow) => {
-      console.log(`CORS DEBUG -> Path: ${req.path}, Origin: ${origin}, Allowed: ${!!allow}, Error: ${err ? err.message : 'none'}`);
-      // proceed regardless; actual cors middleware will set headers
-      next();
-    });
-  } catch (e) {
-    console.log('CORS DEBUG error:', e.message);
-    next();
-  }
-});
-
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,

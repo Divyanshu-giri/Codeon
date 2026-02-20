@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -146,9 +147,8 @@ router.post('/logout', (req, res) => {
   res.json({ message: 'Logout successful' });
 });
 
-// Get current user profile
-router.get('/me', (req, res) => {
-  // This route should be protected by authMiddleware
+// Get current user profile (protected)
+router.get('/me', authMiddleware, (req, res) => {
   res.json({ user: req.user });
 });
 

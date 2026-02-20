@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { fileAPI } from '../services/api';
+import { getBackendURL } from '../config/api.config';
 
 const EditorContext = createContext(null);
 
@@ -68,7 +69,8 @@ export function EditorProvider({ children, accessToken }) {
  useEffect(() => {
    const checkAPI = async () => {
      try {
-       const response = await fetch('http://localhost:5000/health');
+       const backendURL = getBackendURL();
+       const response = await fetch(`${backendURL}/health`);
        setApiAvailable(response.ok);
        console.log('✅ Backend API is available');
      } catch (error) {
@@ -78,6 +80,64 @@ export function EditorProvider({ children, accessToken }) {
    };
    checkAPI();
  }, []);
+
+ // Create or fetch project when user logs in
+ useEffect(() => {
+   if (!accessToken || !apiAvailable) return;
+
+   const initProject = async () => {
+     try {
+       const storedUser = localStorage.getItem('user');
+       if (!storedUser) return;
+
+       const user = JSON.parse(storedUser);
+       
+       // Try to get existing projects for this user
+       const projectsResponse = await fetch(`${getBackendURL()}/api/projects/user/${user._id}`, {
+         headers: {
+           'Authorization': `Bearer ${accessToken}`,
+           'Content-Type': 'application/json'
+         }
+       });
+
+       if (projectsResponse.ok) {
+         const projects = await projectsResponse.json();
+         if (projects && projects.length > 0) {
+           // Use existing project
+           setProjectId(projects[0]._id);
+           console.log('📁 Using existing project:', projects[0].name);
+           return;
+         }
+       }
+
+       // Create a new project if none exists
+       const createResponse = await fetch(`${getBackendURL()}/api/projects`, {
+         method: 'POST',
+         headers: {
+           'Authorization': `Bearer ${accessToken}`,
+           'Content-Type': 'application/json'
+         },
+        body: JSON.stringify({
+           name: 'My Project',
+           description: 'Default CodeOn project',
+           userId: user._id
+         })
+       });
+
+       if (createResponse.ok) {
+         const newProject = await createResponse.json();
+         if (newProject._id) {
+           setProjectId(newProject._id);
+           console.log('📁 Created new project:', newProject.name);
+         }
+       }
+     } catch (error) {
+       console.error('Project initialization error:', error);
+     }
+   };
+
+   initProject();
+ }, [accessToken, apiAvailable]);
 
  // Find a file by ID in the tree
  const findFileById=(node , targetId)=>{
